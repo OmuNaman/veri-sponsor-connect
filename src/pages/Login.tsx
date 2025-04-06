@@ -85,6 +85,7 @@ const Login = () => {
       });
       navigate("/dashboard");
     } catch (err) {
+      console.error("Demo YouTuber login failed:", err);
       setError("Demo login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -105,6 +106,7 @@ const Login = () => {
       });
       navigate("/dashboard");
     } catch (err) {
+      console.error("Demo Sponsor login failed:", err);
       setError("Demo login failed. Please try again.");
     } finally {
       setLoading(false);
