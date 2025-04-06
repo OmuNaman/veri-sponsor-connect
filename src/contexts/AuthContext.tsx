@@ -1,9 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 export type UserRole = "youtuber" | "sponsor";
 
-export type User = {
+export type UserProfile = {
   id: string;
   name: string;
   email: string;
@@ -13,98 +16,142 @@ export type User = {
 };
 
 type AuthContextType = {
-  user: User | null;
+  user: UserProfile | null;
+  session: Session | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<User>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo purposes
-const mockUsers: User[] = [
-  {
-    id: "1",
-    name: "Tech Sponsor",
-    email: "sponsor@example.com",
-    role: "sponsor",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    isVerified: true,
-  },
-  {
-    id: "2",
-    name: "Gaming Channel",
-    email: "youtuber@example.com",
-    role: "youtuber",
-    avatar: "https://i.pravatar.cc/150?img=4",
-    isVerified: true,
-  },
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is already logged in
   useEffect(() => {
-    const storedUser = localStorage.getItem("verisponsor_user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        
+        if (currentSession?.user) {
+          fetchUserProfile(currentSession.user);
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      
+      if (currentSession?.user) {
+        fetchUserProfile(currentSession.user);
+      }
+      
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async (email: string, password: string): Promise<User> => {
-    // Simulate API call
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const foundUser = mockUsers.find(u => u.email === email);
-        if (foundUser) {
-          setUser(foundUser);
-          localStorage.setItem("verisponsor_user", JSON.stringify(foundUser));
-          resolve(foundUser);
-        } else {
-          reject(new Error("Invalid credentials"));
-        }
-      }, 1000);
-    });
+  const fetchUserProfile = async (authUser: User) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      if (data) {
+        setUser({
+          id: data.id,
+          name: data.name,
+          email: authUser.email || '',
+          role: data.role as UserRole,
+          avatar: data.avatar || '',
+          isVerified: data.is_verified,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
   };
 
-  const register = async (name: string, email: string, password: string, role: UserRole): Promise<User> => {
-    // Simulate API call
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const existingUser = mockUsers.find(u => u.email === email);
-        if (existingUser) {
-          reject(new Error("User already exists"));
-        } else {
-          const newUser: User = {
-            id: Math.random().toString(36).substring(7),
+  const login = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "Invalid email or password. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const register = async (name: string, email: string, password: string, role: UserRole) => {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
             name,
-            email,
             role,
-            avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`,
-            isVerified: false,
-          };
-          
-          // In a real app, we would add this user to a database
-          setUser(newUser);
-          localStorage.setItem("verisponsor_user", JSON.stringify(newUser));
-          resolve(newUser);
-        }
-      }, 1000);
-    });
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "Registration failed. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("verisponsor_user");
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error: any) {
+      toast({
+        title: "Logout failed",
+        description: error.message || "Logout failed. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const value = {
     user,
+    session,
     loading,
     login,
     register,
