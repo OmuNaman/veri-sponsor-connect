@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -38,7 +37,6 @@ import {
   getSponsorProfileByUserId 
 } from "@/services/mockData";
 
-// YouTuber Profile Form Schema
 const youtuberProfileSchema = z.object({
   channelName: z.string().min(2, { message: "Channel name is required" }),
   channelUrl: z.string().url({ message: "Please enter a valid URL" }),
@@ -50,7 +48,6 @@ const youtuberProfileSchema = z.object({
   priceRange: z.string().min(1, { message: "Price range is required" }),
 });
 
-// Sponsor Profile Form Schema
 const sponsorProfileSchema = z.object({
   companyName: z.string().min(2, { message: "Company name is required" }),
   website: z.string().url({ message: "Please enter a valid URL" }),
@@ -63,8 +60,8 @@ const sponsorProfileSchema = z.object({
 
 const Profile = () => {
   const { user } = useAuth();
-  const { id } = useParams(); // Get ID from URL if viewing someone else's profile
-  const [viewMode, setViewMode] = useState(!!id); // If ID is in URL, we're in view mode
+  const { id } = useParams();
+  const [viewMode, setViewMode] = useState(!!id);
   const [profileData, setProfileData] = useState(null);
   const [profileUser, setProfileUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,20 +94,16 @@ const Profile = () => {
     },
   });
 
-  // Load profile data
   useEffect(() => {
     const targetUserId = id || (user ? user.id : null);
     if (targetUserId) {
-      // If viewing someone else's profile, fetch their user data
       const profileOwner = id ? getUserById(id) : user;
       setProfileUser(profileOwner);
 
-      // Get the appropriate profile data based on user role
       if (profileOwner.role === "youtuber") {
         const youtuberProfile = getYouTuberProfileByUserId(targetUserId);
         setProfileData(youtuberProfile);
         
-        // If we have data and are not in view mode, pre-fill the form
         if (youtuberProfile && !viewMode) {
           youtuberForm.reset({
             channelName: youtuberProfile.channelName,
@@ -127,7 +120,6 @@ const Profile = () => {
         const sponsorProfile = getSponsorProfileByUserId(targetUserId);
         setProfileData(sponsorProfile);
         
-        // If we have data and are not in view mode, pre-fill the form
         if (sponsorProfile && !viewMode) {
           sponsorForm.reset({
             companyName: sponsorProfile.companyName,
@@ -141,7 +133,6 @@ const Profile = () => {
         }
       }
 
-      // Check verification status
       setVerificationStatus(profileOwner.isVerified ? "verified" : profileData ? "pending" : "unverified");
     }
   }, [id, user, viewMode]);
@@ -149,7 +140,6 @@ const Profile = () => {
   const onYoutuberSubmit = (data) => {
     setIsLoading(true);
     
-    // Simulate API call
     setTimeout(() => {
       toast({
         title: "Profile updated successfully",
@@ -157,7 +147,6 @@ const Profile = () => {
       });
       setIsLoading(false);
       
-      // Update verification status to pending
       setVerificationStatus("pending");
     }, 1500);
   };
@@ -165,7 +154,6 @@ const Profile = () => {
   const onSponsorSubmit = (data) => {
     setIsLoading(true);
     
-    // Simulate API call
     setTimeout(() => {
       toast({
         title: "Profile updated successfully",
@@ -173,12 +161,10 @@ const Profile = () => {
       });
       setIsLoading(false);
       
-      // Update verification status to pending
       setVerificationStatus("pending");
     }, 1500);
   };
 
-  // Display loading state while fetching data
   if (!profileUser) {
     return (
       <Layout>
@@ -192,7 +178,6 @@ const Profile = () => {
   return (
     <Layout>
       <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {/* Profile Header */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
           <div className="bg-gradient-to-r from-verisponsor-blue to-verisponsor-purple h-32"></div>
           <div className="px-6 pb-6">
@@ -230,9 +215,7 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Profile Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Sidebar with stats */}
           <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
@@ -247,7 +230,6 @@ const Profile = () => {
                 {profileData ? (
                   <>
                     {profileUser.role === "youtuber" ? (
-                      // YouTuber Stats
                       <div className="space-y-4">
                         <div>
                           <h3 className="text-sm font-medium text-gray-500">Channel Name</h3>
@@ -297,7 +279,6 @@ const Profile = () => {
                         </div>
                       </div>
                     ) : (
-                      // Sponsor Stats
                       <div className="space-y-4">
                         <div>
                           <h3 className="text-sm font-medium text-gray-500">Company Name</h3>
@@ -361,10 +342,8 @@ const Profile = () => {
             )}
           </div>
 
-          {/* Main content area */}
           <div className="lg:col-span-2">
             {viewMode ? (
-              // View mode
               <Card>
                 <CardHeader>
                   <CardTitle>About</CardTitle>
@@ -439,7 +418,6 @@ const Profile = () => {
                 </CardContent>
               </Card>
             ) : (
-              // Edit mode
               <Card>
                 <CardHeader>
                   <CardTitle>Complete Your Profile</CardTitle>
@@ -449,7 +427,6 @@ const Profile = () => {
                 </CardHeader>
                 <CardContent>
                   {user.role === "youtuber" ? (
-                    // YouTuber Profile Form
                     <Form {...youtuberForm}>
                       <form onSubmit={youtuberForm.handleSubmit(onYoutuberSubmit)} className="space-y-6">
                         <FormField
@@ -579,7 +556,6 @@ const Profile = () => {
                       </form>
                     </Form>
                   ) : (
-                    // Sponsor Profile Form
                     <Form {...sponsorForm}>
                       <form onSubmit={sponsorForm.handleSubmit(onSponsorSubmit)} className="space-y-6">
                         <FormField
@@ -704,7 +680,6 @@ const Profile = () => {
   );
 };
 
-// Helper component for verification status
 const VerificationBadge = ({ status }) => {
   const variants = {
     unverified: {

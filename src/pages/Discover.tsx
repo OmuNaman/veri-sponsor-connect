@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +32,9 @@ import {
   getAllYouTubers, 
   getAllSponsors,
   getYouTuberProfileByUserId,
-  getSponsorProfileByUserId
+  getSponsorProfileByUserId,
+  YouTuberProfile,
+  SponsorProfile
 } from "@/services/mockData";
 
 // Helper function to format large numbers
@@ -239,10 +240,90 @@ const Discover = () => {
         {/* Results grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedProfiles.map((profile) => {
-            // Get extended profile data
+            // Get extended profile data based on user role
             const extendedProfile = user?.role === "sponsor" 
-              ? getYouTuberProfileByUserId(profile.id)
-              : getSponsorProfileByUserId(profile.id);
+              ? getYouTuberProfileByUserId(profile.id) as YouTuberProfile | null
+              : getSponsorProfileByUserId(profile.id) as SponsorProfile | null;
+            
+            if (!extendedProfile) {
+              return null; // Skip if no extended profile
+            }
+
+            // Render different content based on user role
+            const renderProfileContent = () => {
+              if (user?.role === "sponsor" && "stats" in extendedProfile) {
+                // For sponsors viewing YouTuber profiles
+                return (
+                  <div>
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+                      {extendedProfile.description}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className="bg-gray-50 p-2 rounded">
+                        <p className="text-xs text-gray-500">Subscribers</p>
+                        <p className="font-semibold">{formatNumber(extendedProfile.stats.subscribers)}</p>
+                      </div>
+                      <div className="bg-gray-50 p-2 rounded">
+                        <p className="text-xs text-gray-500">Avg. Views</p>
+                        <p className="font-semibold">{formatNumber(extendedProfile.stats.averageViews)}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {extendedProfile.categories.map((category, idx) => (
+                        <Badge key={idx} variant="secondary" className="bg-gray-100">
+                          {category}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-500">Price Range: </span>
+                      <span className="font-medium">{extendedProfile.priceRange}</span>
+                    </div>
+                  </div>
+                );
+              } else if (user?.role === "youtuber" && "industry" in extendedProfile) {
+                // For YouTubers viewing sponsor profiles
+                return (
+                  <div>
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+                      {extendedProfile.description}
+                    </p>
+                    <div className="bg-gray-50 p-2 rounded mb-4">
+                      <p className="text-xs text-gray-500">Budget Range</p>
+                      <p className="font-semibold">{extendedProfile.budget}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {extendedProfile.industry.map((ind, idx) => (
+                        <Badge key={idx} variant="secondary" className="bg-gray-100">
+                          {ind}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-500">Location: </span>
+                      <span className="font-medium">{extendedProfile.location}</span>
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Fallback if profile type doesn't match
+              return (
+                <div className="h-32 flex items-center justify-center">
+                  <p className="text-gray-400">Profile information not available</p>
+                </div>
+              );
+            };
+
+            // Get profile display name based on role
+            const getProfileDisplayName = () => {
+              if (user?.role === "sponsor" && "channelName" in extendedProfile) {
+                return extendedProfile.channelName || "YouTube Creator";
+              } else if (user?.role === "youtuber" && "companyName" in extendedProfile) {
+                return extendedProfile.companyName || "Brand Sponsor";
+              }
+              return user?.role === "sponsor" ? "YouTube Creator" : "Brand Sponsor";
+            };
             
             return (
               <Card key={profile.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -258,71 +339,14 @@ const Discover = () => {
                           {profile.isVerified && <VerifiedBadge size="sm" className="ml-1" />}
                         </CardTitle>
                         <CardDescription>
-                          {user?.role === "sponsor" 
-                            ? extendedProfile?.channelName || "YouTube Creator"
-                            : extendedProfile?.companyName || "Brand Sponsor"
-                          }
+                          {getProfileDisplayName()}
                         </CardDescription>
                       </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {user?.role === "sponsor" && extendedProfile ? (
-                    // YouTuber stats for sponsors
-                    <div>
-                      <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                        {extendedProfile.description}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 mb-4">
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-xs text-gray-500">Subscribers</p>
-                          <p className="font-semibold">{formatNumber(extendedProfile.stats.subscribers)}</p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-xs text-gray-500">Avg. Views</p>
-                          <p className="font-semibold">{formatNumber(extendedProfile.stats.averageViews)}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {extendedProfile.categories.map((category, idx) => (
-                          <Badge key={idx} variant="secondary" className="bg-gray-100">
-                            {category}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-gray-500">Price Range: </span>
-                        <span className="font-medium">{extendedProfile.priceRange}</span>
-                      </div>
-                    </div>
-                  ) : extendedProfile ? (
-                    // Sponsor info for YouTubers
-                    <div>
-                      <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                        {extendedProfile.description}
-                      </p>
-                      <div className="bg-gray-50 p-2 rounded mb-4">
-                        <p className="text-xs text-gray-500">Budget Range</p>
-                        <p className="font-semibold">{extendedProfile.budget}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {extendedProfile.industry.map((ind, idx) => (
-                          <Badge key={idx} variant="secondary" className="bg-gray-100">
-                            {ind}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-gray-500">Location: </span>
-                        <span className="font-medium">{extendedProfile.location}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-32 flex items-center justify-center">
-                      <p className="text-gray-400">Profile information not available</p>
-                    </div>
-                  )}
+                  {renderProfileContent()}
                 </CardContent>
                 <CardFooter className="bg-gray-50 border-t flex justify-between">
                   <TooltipProvider>
