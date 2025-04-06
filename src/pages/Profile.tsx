@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, YouTuberProfile, SponsorProfile } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,11 +32,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MessageSquare, Link as LinkIcon, ChevronRight, Shield, CheckCircle2 } from "lucide-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { 
-  getUserById, 
-  getYouTuberProfileByUserId, 
-  getSponsorProfileByUserId 
-} from "@/services/mockData";
 
 const youtuberProfileSchema = z.object({
   channelName: z.string().min(2, { message: "Channel name is required" }),
@@ -59,12 +55,13 @@ const sponsorProfileSchema = z.object({
 });
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, getUserById, getYouTuberProfileByUserId, getSponsorProfileByUserId } = useAuth();
   const { id } = useParams();
   const [viewMode, setViewMode] = useState(!!id);
   const [profileData, setProfileData] = useState(null);
   const [profileUser, setProfileUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchingProfile, setFetchingProfile] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState("unverified");
 
   const youtuberForm = useForm({
@@ -95,47 +92,38 @@ const Profile = () => {
   });
 
   useEffect(() => {
-    const targetUserId = id || (user ? user.id : null);
-    if (targetUserId) {
-      const profileOwner = id ? getUserById(id) : user;
-      setProfileUser(profileOwner);
+    const fetchProfile = async () => {
+      setFetchingProfile(true);
+      const targetUserId = id || (user ? user.id : null);
+      if (targetUserId) {
+        try {
+          let profileOwner = user;
+          // If viewing someone else's profile, fetch their user data
+          if (id && id !== user?.id) {
+            profileOwner = await getUserById(id);
+          }
+          
+          if (profileOwner) {
+            setProfileUser(profileOwner);
 
-      if (profileOwner.role === "youtuber") {
-        const youtuberProfile = getYouTuberProfileByUserId(targetUserId);
-        setProfileData(youtuberProfile);
-        
-        if (youtuberProfile && !viewMode) {
-          youtuberForm.reset({
-            channelName: youtuberProfile.channelName,
-            channelUrl: youtuberProfile.channelUrl,
-            description: youtuberProfile.description,
-            categories: youtuberProfile.categories.join(", "),
-            location: youtuberProfile.location,
-            subscribers: youtuberProfile.stats.subscribers.toString(),
-            averageViews: youtuberProfile.stats.averageViews.toString(),
-            priceRange: youtuberProfile.priceRange,
-          });
+            // For now, we'll set placeholder profile data until we implement the extended profile tables
+            setProfileData(null);
+            
+            // For demonstration, we'll simulate the verification status based on the user's isVerified property
+            setVerificationStatus(profileOwner.isVerified ? "verified" : "unverified");
+          }
+        } catch (error) {
+          console.error("Error fetching profile:", error);
+        } finally {
+          setFetchingProfile(false);
         }
-      } else if (profileOwner.role === "sponsor") {
-        const sponsorProfile = getSponsorProfileByUserId(targetUserId);
-        setProfileData(sponsorProfile);
-        
-        if (sponsorProfile && !viewMode) {
-          sponsorForm.reset({
-            companyName: sponsorProfile.companyName,
-            website: sponsorProfile.website,
-            description: sponsorProfile.description,
-            industry: sponsorProfile.industry.join(", "),
-            location: sponsorProfile.location,
-            budget: sponsorProfile.budget,
-            targetAudience: sponsorProfile.targetAudience.join(", "),
-          });
-        }
+      } else {
+        setFetchingProfile(false);
       }
+    };
 
-      setVerificationStatus(profileOwner.isVerified ? "verified" : profileData ? "pending" : "unverified");
-    }
-  }, [id, user, viewMode]);
+    fetchProfile();
+  }, [id, user, getUserById, getYouTuberProfileByUserId, getSponsorProfileByUserId]);
 
   const onYoutuberSubmit = (data) => {
     setIsLoading(true);
@@ -165,11 +153,25 @@ const Profile = () => {
     }, 1500);
   };
 
-  if (!profileUser) {
+  if (fetchingProfile) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-verisponsor-blue"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!profileUser) {
+    return (
+      <Layout>
+        <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <h1 className="text-2xl font-bold mb-2">Profile Not Found</h1>
+            <p className="text-gray-500 mb-6">The user profile you're looking for doesn't exist or you don't have permission to view it.</p>
+            <Button onClick={() => window.history.back()}>Go Back</Button>
+          </div>
         </div>
       </Layout>
     );
@@ -315,7 +317,7 @@ const Profile = () => {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-500">Profile information not available</p>
+                    <p className="text-gray-500">Extended profile information not available yet</p>
                   </div>
                 )}
               </CardContent>
@@ -412,7 +414,10 @@ const Profile = () => {
                     </div>
                   ) : (
                     <div className="text-center py-16">
-                      <p className="text-gray-500">No profile information available</p>
+                      <p className="text-gray-500">Extended profile information not available yet</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        We need to create the YouTuber and Sponsor profile tables in Supabase
+                      </p>
                     </div>
                   )}
                 </CardContent>

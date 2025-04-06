@@ -1,6 +1,7 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, YouTuberProfile, SponsorProfile } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,14 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Search, Filter, MessageSquare, Users, Star } from "lucide-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { 
-  getAllYouTubers, 
-  getAllSponsors,
-  getYouTuberProfileByUserId,
-  getSponsorProfileByUserId,
-  YouTuberProfile,
-  SponsorProfile
-} from "@/services/mockData";
 
 // Helper function to format large numbers
 const formatNumber = (num) => {
@@ -49,17 +42,35 @@ const formatNumber = (num) => {
 };
 
 const Discover = () => {
-  const { user } = useAuth();
+  const { user, getAllYouTubers, getAllSponsors, getYouTuberProfileByUserId, getSponsorProfileByUserId } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [subscriberRange, setSubscriberRange] = useState([0, 2000000]);
   const [sort, setSort] = useState("relevance");
   const [showFilters, setShowFilters] = useState(false);
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
   
-  // Get profiles based on user role
-  const profiles = user?.role === "sponsor" 
-    ? getAllYouTubers() 
-    : getAllSponsors();
+  // Fetch profiles based on user role
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!user) return;
+      
+      setLoading(true);
+      try {
+        const fetchedProfiles = user.role === "sponsor" 
+          ? await getAllYouTubers() 
+          : await getAllSponsors();
+        setProfiles(fetchedProfiles);
+      } catch (error) {
+        console.error("Error fetching profiles:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProfiles();
+  }, [user, getAllYouTubers, getAllSponsors]);
 
   // Apply filters and search
   const filteredProfiles = profiles.filter(profile => {
@@ -68,35 +79,8 @@ const Discover = () => {
       return false;
     }
     
-    // For YouTuber-specific filtering (when user is a sponsor)
-    if (user?.role === "sponsor") {
-      const youtuberProfile = getYouTuberProfileByUserId(profile.id);
-      
-      if (!youtuberProfile) return false;
-      
-      // Category filter
-      if (category !== "all" && !youtuberProfile.categories.includes(category)) {
-        return false;
-      }
-      
-      // Subscriber range filter
-      if (youtuberProfile.stats.subscribers < subscriberRange[0] || 
-          youtuberProfile.stats.subscribers > subscriberRange[1]) {
-        return false;
-      }
-    }
-    
-    // For Sponsor-specific filtering (when user is a youtuber)
-    if (user?.role === "youtuber") {
-      const sponsorProfile = getSponsorProfileByUserId(profile.id);
-      
-      if (!sponsorProfile) return false;
-      
-      // Industry filter
-      if (category !== "all" && !sponsorProfile.industry.includes(category)) {
-        return false;
-      }
-    }
+    // For now, we'll skip additional filtering since we don't have the extended profile data yet
+    // In a real implementation, we would fetch the extended profiles and filter based on them
     
     return true;
   });
@@ -237,163 +221,89 @@ const Discover = () => {
           <span>{sortedProfiles.length} results found</span>
         </div>
 
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-verisponsor-blue"></div>
+          </div>
+        )}
+
         {/* Results grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedProfiles.map((profile) => {
-            // Get extended profile data based on user role
-            const extendedProfile = user?.role === "sponsor" 
-              ? getYouTuberProfileByUserId(profile.id) as YouTuberProfile | null
-              : getSponsorProfileByUserId(profile.id) as SponsorProfile | null;
-            
-            if (!extendedProfile) {
-              return null; // Skip if no extended profile
-            }
-
-            // Render different content based on user role
-            const renderProfileContent = () => {
-              if (user?.role === "sponsor" && "stats" in extendedProfile) {
-                // For sponsors viewing YouTuber profiles
-                return (
-                  <div>
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                      {extendedProfile.description}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <div className="bg-gray-50 p-2 rounded">
-                        <p className="text-xs text-gray-500">Subscribers</p>
-                        <p className="font-semibold">{formatNumber(extendedProfile.stats.subscribers)}</p>
-                      </div>
-                      <div className="bg-gray-50 p-2 rounded">
-                        <p className="text-xs text-gray-500">Avg. Views</p>
-                        <p className="font-semibold">{formatNumber(extendedProfile.stats.averageViews)}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {extendedProfile.categories.map((category, idx) => (
-                        <Badge key={idx} variant="secondary" className="bg-gray-100">
-                          {category}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-gray-500">Price Range: </span>
-                      <span className="font-medium">{extendedProfile.priceRange}</span>
-                    </div>
-                  </div>
-                );
-              } else if (user?.role === "youtuber" && "industry" in extendedProfile) {
-                // For YouTubers viewing sponsor profiles
-                return (
-                  <div>
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                      {extendedProfile.description}
-                    </p>
-                    <div className="bg-gray-50 p-2 rounded mb-4">
-                      <p className="text-xs text-gray-500">Budget Range</p>
-                      <p className="font-semibold">{extendedProfile.budget}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {extendedProfile.industry.map((ind, idx) => (
-                        <Badge key={idx} variant="secondary" className="bg-gray-100">
-                          {ind}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-gray-500">Location: </span>
-                      <span className="font-medium">{extendedProfile.location}</span>
-                    </div>
-                  </div>
-                );
-              }
-              
-              // Fallback if profile type doesn't match
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sortedProfiles.map((profile) => {
               return (
-                <div className="h-32 flex items-center justify-center">
-                  <p className="text-gray-400">Profile information not available</p>
-                </div>
-              );
-            };
-
-            // Get profile display name based on role
-            const getProfileDisplayName = () => {
-              if (user?.role === "sponsor" && "channelName" in extendedProfile) {
-                return extendedProfile.channelName || "YouTube Creator";
-              } else if (user?.role === "youtuber" && "companyName" in extendedProfile) {
-                return extendedProfile.companyName || "Brand Sponsor";
-              }
-              return user?.role === "sponsor" ? "YouTube Creator" : "Brand Sponsor";
-            };
-            
-            return (
-              <Card key={profile.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-start space-x-4">
-                      <div className="h-12 w-12 rounded-full bg-gray-200 overflow-hidden">
-                        <img src={profile.avatar} alt={profile.name} className="h-full w-full object-cover" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg flex items-center">
-                          {profile.name}
-                          {profile.isVerified && <VerifiedBadge size="sm" className="ml-1" />}
-                        </CardTitle>
-                        <CardDescription>
-                          {getProfileDisplayName()}
-                        </CardDescription>
+                <Card key={profile.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-start space-x-4">
+                        <div className="h-12 w-12 rounded-full bg-gray-200 overflow-hidden">
+                          <img src={profile.avatar} alt={profile.name} className="h-full w-full object-cover" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg flex items-center">
+                            {profile.name}
+                            {profile.isVerified && <VerifiedBadge size="sm" className="ml-1" />}
+                          </CardTitle>
+                          <CardDescription>
+                            {user?.role === "sponsor" ? "YouTube Creator" : "Brand Sponsor"}
+                          </CardDescription>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {renderProfileContent()}
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t flex justify-between">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-gray-500">
-                          <Star className="h-4 w-4 mr-1" />
-                          Save
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Save to favorites</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  
-                  <Button className="flex items-center">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Connect
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-gray-500 mb-4">
+                      Profile information will be available once extended profile data is implemented
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-gray-50 border-t flex justify-between">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-gray-500">
+                            <Star className="h-4 w-4 mr-1" />
+                            Save
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Save to favorites</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <Button className="flex items-center">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Connect
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
 
-          {sortedProfiles.length === 0 && (
-            <div className="col-span-full py-16 text-center">
-              <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                <Search className="h-8 w-8 text-gray-400" />
+            {sortedProfiles.length === 0 && !loading && (
+              <div className="col-span-full py-16 text-center">
+                <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <Search className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No results found</h3>
+                <p className="text-gray-500 mb-4">Try adjusting your search or filters</p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCategory("all");
+                    setSubscriberRange([0, 2000000]);
+                    setSort("relevance");
+                    setShowFilters(false);
+                  }}
+                >
+                  Reset all filters
+                </Button>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-1">No results found</h3>
-              <p className="text-gray-500 mb-4">Try adjusting your search or filters</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchQuery("");
-                  setCategory("all");
-                  setSubscriberRange([0, 2000000]);
-                  setSort("relevance");
-                  setShowFilters(false);
-                }}
-              >
-                Reset all filters
-              </Button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </Layout>
   );
