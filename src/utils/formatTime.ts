@@ -1,8 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Layout from '@/components/Layout';
 
-// For the formatMessageTime function in Messages.tsx
-const formatMessageTime = (date) => {
+export const formatMessageTime = (date: string | number | Date) => {
   const now = new Date();
   const messageDate = new Date(date);
   const diffDays = Math.floor((now.getTime() - messageDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -17,9 +14,3 @@ const formatMessageTime = (date) => {
     return messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 };
-
-const Messages = () => {
-  // ... keep existing code (component implementation)
-};
-
-export default Messages;

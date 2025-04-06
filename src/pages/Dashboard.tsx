@@ -1,3 +1,5 @@
+import React, { useState } from 'react';
+import Layout from '@/components/Layout';
 
 // For the formatMessageTime function in Dashboard.tsx
 const formatMessageTime = (date) => {
@@ -15,3 +17,9 @@ const formatMessageTime = (date) => {
     return messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 };
+
+const Dashboard = () => {
+  // component implementation
+};
+
+export default Dashboard;
